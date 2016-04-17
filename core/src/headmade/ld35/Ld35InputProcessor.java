@@ -32,35 +32,36 @@ public class Ld35InputProcessor implements InputProcessor {
 
 	@Override
 	public boolean keyDown(int keycode) {
-		// if (game.debugEnabled) {
-		if (keycode == Keys.LEFT || keycode == Keys.A) {
-			game.cam.translate(-1f, 0f);
-			game.cam.update();
-			return true;
-		} else if (keycode == Keys.RIGHT || keycode == Keys.D) {
-			game.cam.translate(1f, 0f);
-			game.cam.update();
-			return true;
-		} else if (keycode == Keys.UP || keycode == Keys.W) {
-			game.cam.translate(0f, 1f);
-			game.cam.update();
-			return true;
-		} else if (keycode == Keys.DOWN || keycode == Keys.S) {
-			game.cam.translate(0f, -1f);
-			game.cam.update();
+		if (game.debugEnabled) {
+			if (keycode == Keys.LEFT || keycode == Keys.A) {
+				game.cam.translate(-1f, 0f);
+				game.cam.update();
+				return true;
+			} else if (keycode == Keys.RIGHT || keycode == Keys.D) {
+				game.cam.translate(1f, 0f);
+				game.cam.update();
+				return true;
+			} else if (keycode == Keys.UP || keycode == Keys.W) {
+				game.cam.translate(0f, 1f);
+				game.cam.update();
+				return true;
+			} else if (keycode == Keys.DOWN || keycode == Keys.S) {
+				game.cam.translate(0f, -1f);
+				game.cam.update();
+				return true;
+			} else if (keycode == Keys.R) {
+				if (game.currentState == game.STATE_GAME) {
+					game.reset();
+				}
+				return true;
+			}
+		}
+		if (keycode == Keys.F12) {
+			game.debugEnabled = !game.debugEnabled;
 			return true;
 		} else if (keycode == Keys.SPACE) {
 			game.checkTrunkConnections();
-			return true;
-		} else if (keycode == Keys.R) {
-			if (game.currentState == game.STATE_GAME) {
-				game.reset();
-			}
-			return true;
-		}
-		// }
-		if (keycode == Keys.F12) {
-			game.debugEnabled = !game.debugEnabled;
+			game.finishHedge();
 			return true;
 		}
 		return false;
@@ -78,7 +79,9 @@ public class Ld35InputProcessor implements InputProcessor {
 
 	@Override
 	public boolean touchDown(int screenX, int screenY, int pointer, int button) {
-		game.incState();
+		if (screenX > game.camPix.viewportWidth / 2f) {
+			game.showDesc = !game.showDesc;
+		}
 
 		touchDownPoint = game.cam.unproject(new Vector3(screenX, screenY, 0));
 		Gdx.app.log(TAG, "Mouse clicked at " + touchDownPoint);
@@ -135,6 +138,7 @@ public class Ld35InputProcessor implements InputProcessor {
 				game.world.rayCast(callback, touchDown, cutVec.cpy().add(touchDown));
 			}
 		}
+		game.incState();
 
 		return false;
 	}
@@ -159,12 +163,12 @@ public class Ld35InputProcessor implements InputProcessor {
 
 	@Override
 	public boolean scrolled(int amount) {
-		// if (game.debugEnabled) {
-		game.cam.zoom += amount * 0.5f;
-		game.cam.zoom = MathUtils.clamp(game.cam.zoom, 0.5f, 50f);
-		game.cam.update();
-		Gdx.app.log(TAG, "new zoom " + game.cam.zoom);
-		// }
+		if (game.debugEnabled) {
+			game.cam.zoom += amount * 0.5f;
+			game.cam.zoom = MathUtils.clamp(game.cam.zoom, 0.5f, 50f);
+			game.cam.update();
+			Gdx.app.log(TAG, "new zoom " + game.cam.zoom);
+		}
 		return false;
 	}
 

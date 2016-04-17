@@ -10,6 +10,7 @@ import com.badlogic.gdx.assets.loaders.FileHandleResolver;
 import com.badlogic.gdx.assets.loaders.SkinLoader;
 import com.badlogic.gdx.assets.loaders.SkinLoader.SkinParameter;
 import com.badlogic.gdx.assets.loaders.resolvers.InternalFileHandleResolver;
+import com.badlogic.gdx.audio.Music;
 import com.badlogic.gdx.audio.Sound;
 import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.graphics.Texture;
@@ -28,15 +29,15 @@ public class Assets implements Disposable, AssetErrorListener {
 	private static final String			TAG				= Assets.class.getName();
 
 	public static final String			HEADMADE_LOGO	= "headmade_large.png";
-	public static final String			PACKS_BASE		= "packs/";											// +
-																											// File.separator;
+	public static final String			PACKS_BASE		= "packs/";																// +
+																																// File.separator;
 	public static final String			PACK			= "pack";
 	public static final String			GAME_ATLAS		= PACKS_BASE + PACK + ".atlas";
 	public static final String			RAW_ASSETS		= "assets-raw/images";
 
 	public static final SkinParameter	skinParameter	= new SkinLoader.SkinParameter(Assets.GAME_ATLAS);
 	public static final String			skinPath		= Assets.PACKS_BASE + Assets.PACK + ".json";
-	public static final String			music			= "music/bg.ogg";
+	public static final String			music			= "audio/bg.ogg";
 	public static final String			sndCash			= "audio/cash.wav";
 	public static final String			sndOpen			= "audio/open.wav";
 	public static final String			sndCut			= "audio/cut.wav";
@@ -52,15 +53,18 @@ public class Assets implements Disposable, AssetErrorListener {
 	public static final String			txBlueprint		= "blueprint";
 	// public static final String[] txLeafs = { "leaf01", "leaf02", "leaf03", "leaf04", "leaf05" };
 	// public static final String[] txBranches = { "branch01", "branch02", "branch03", "branch04", "branch05" };
-	public static final String			shapeDollar		= "shapes/dollar.json";
+	public static final String			shapes[]		= { "shapes/trump.json", "shapes/pirate.json", "shapes/creeper.json",
+			"shapes/triforce.json", "shapes/elephant.json", "shapes/man.json", "shapes/star.json", "shapes/ship.json",
+			"shapes/dollar.json" };
 
-	public static final Assets			instance		= new Assets();										// Singleton
+	public static final Assets			instance		= new Assets();															// Singleton
 
 	public static AssetManager			assetsManager;
 
-	public TextureAtlas					atlas;																// Don't make
-																											// this
-																											// static!!!
+	public TextureAtlas					atlas;																					// Don't
+																																// make
+																																// this
+																																// static!!!
 	public Skin							skin;
 
 	// singleton: prevent instantiation from other classes
@@ -113,7 +117,7 @@ public class Assets implements Disposable, AssetErrorListener {
 	public void loadAll() {
 		Gdx.app.debug(TAG, "Init assets...");
 
-		// assetsManager.load(music, Music.class);
+		assetsManager.load(music, Music.class);
 		assetsManager.load(sndOpen, Sound.class);
 		assetsManager.load(sndCut, Sound.class);
 		assetsManager.load(sndCash, Sound.class);
@@ -121,7 +125,9 @@ public class Assets implements Disposable, AssetErrorListener {
 		assetsManager.load(GAME_ATLAS, TextureAtlas.class);
 		assetsManager.load(skinPath, Skin.class, skinParameter);
 
-		assetsManager.load(shapeDollar, ShapeJson.class);
+		for (final String shape : shapes) {
+			assetsManager.load(shape, ShapeJson.class);
+		}
 
 	}
 
