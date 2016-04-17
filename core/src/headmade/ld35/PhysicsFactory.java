@@ -39,18 +39,20 @@ public class PhysicsFactory {
 	private static final short	POT_MASKBITS		= LEVEL_CATEGORYBITS | LIGHT_CATEGORYBITS | LEAF_CATEGORYBITS;
 	private static final short	LIGHT_MASKBITS		= LEVEL_CATEGORYBITS | LEAF_CATEGORYBITS | TRUNK_CATEGORYBITS | POT_CATEGORYBITS;
 
+	private Ld35				game;
 	private World				world;
 	private Shape				circleShape;
 
-	private float				leafRadius			= Ld35.UNIT_SCALE * 5f;
+	// private float leafRadius = Ld35.UNIT_SCALE * 7f;
 
 	private TextureRegion		txPot;
 	private Box2DSprite			potSprite;
 	private Box2DSprite			trunkSprite;
 	private Box2DSprite[]		leafsSprite			= new Box2DSprite[2];
 
-	public PhysicsFactory(World world) {
+	public PhysicsFactory(World world, Ld35 game) {
 		this.world = world;
+		this.game = game;
 		circleShape = new CircleShape();
 
 		txPot = Assets.instance.skin.get(Assets.txPot, TextureRegion.class);
@@ -95,8 +97,8 @@ public class PhysicsFactory {
 		final Body potBody;
 		final float trunkWidth = width / 2f;
 		final float trunkHeight = height + width * 0.8f;
-		final Rectangle trunkRect = new Rectangle(posX - trunkWidth / 2f, posY + width, trunkWidth, trunkHeight + width);
-		Gdx.app.log(TAG, "TrunkRect " + trunkRect);
+		game.trunkRect = new Rectangle(posX - trunkWidth / 2f, posY + width, trunkWidth, trunkHeight);
+		Gdx.app.log(TAG, "TrunkRect " + game.trunkRect);
 		{
 			{
 				// pot
@@ -117,7 +119,7 @@ public class PhysicsFactory {
 				potFix.setDensity(1f);
 				potFix.getFilterData().categoryBits = POT_CATEGORYBITS;
 				potFix.getFilterData().maskBits = POT_MASKBITS;
-				potBody.setUserData(potSprite);
+				// potBody.setUserData(potSprite);
 				potFix.setUserData(potSprite);
 				potShape.dispose();
 			}
@@ -126,9 +128,9 @@ public class PhysicsFactory {
 				// trunk
 				final BodyDef bd = new BodyDef();
 				bd.type = BodyType.DynamicBody;
-				bd.position.set(trunkRect.x, trunkRect.y);
+				bd.position.set(game.trunkRect.x, game.trunkRect.y);
 				final PolygonShape trunkShape = new PolygonShape();
-				trunkShape.setAsBox(trunkRect.width / 2f, trunkRect.height / 2f);
+				trunkShape.setAsBox(game.trunkRect.width / 2f, game.trunkRect.height / 2f);
 				final FixtureDef fixDef = new FixtureDef();
 				fixDef.shape = trunkShape;
 				fixDef.density = 1f;
@@ -139,7 +141,7 @@ public class PhysicsFactory {
 				trunkFix.setDensity(1f);
 				trunkFix.getFilterData().categoryBits = TRUNK_CATEGORYBITS;
 				trunkFix.getFilterData().maskBits = TRUNK_MASKBITS;
-				trunkBody.setUserData(trunkSprite);
+				// trunkBody.setUserData(trunkSprite);
 				trunkFix.setUserData(trunkSprite);
 				trunkShape.dispose();
 			}
@@ -148,14 +150,15 @@ public class PhysicsFactory {
 			jointDef.bodyA = potBody;
 			jointDef.bodyB = trunkBody;
 			jointDef.localAnchorA.set(0, 0);
-			jointDef.localAnchorB.set(0, -trunkRect.height / 2f - width);
+			jointDef.localAnchorB.set(0, -game.trunkRect.height / 2f - width);
 
 			final Joint j1 = world.createJoint(jointDef);
 		}
 
-		final Vector2 leafPos = new Vector2(posX, posY).add(-width / 2f, width * 1.5f);
+		final Vector2 leafPos = new Vector2(posX, posY).add(-width / 2f, width * 1.25f);
 		// create leaf bodies
 		final Array<Array<Body>> bodies = new Array<Array<Body>>();
+		final float leafRadius = game.leafRadius;// 6f / 40f;
 		{
 			final FixtureDef fixDef = new FixtureDef();
 			circleShape.setRadius(leafRadius);
@@ -175,11 +178,12 @@ public class PhysicsFactory {
 					final Body leafBody = world.createBody(def);
 					final Fixture leafFix = leafBody.createFixture(fixDef);
 					leafFix.setUserData(RandomUtil.random(leafsSprite));
-					leafBody.setUserData(RandomUtil.random(leafsSprite));
+					leafBody.setUserData(new Leaf(w, h));
 					bodies.get(h).add(leafBody);
 				}
 			}
 			Gdx.app.log(TAG, bodies.size + " bodies high; " + bodies.first().size + " bodies wide");
+			game.setHedgeMatrix(bodies);
 		}
 
 		{ // create joints
@@ -218,7 +222,7 @@ public class PhysicsFactory {
 						connection.add(j);
 					}
 
-					if (trunkRect.contains(body.getWorldCenter())) {
+					if (game.trunkRect.contains(body.getWorldCenter())) {
 						// create joint with trunk
 						// Gdx.app.log(TAG, "Welding to anchor " + body.getWorldCenter());
 						final WeldJointDef jDef = new WeldJointDef();

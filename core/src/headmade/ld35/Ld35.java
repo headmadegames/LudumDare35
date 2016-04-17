@@ -2,31 +2,47 @@ package headmade.ld35;
 
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.ParticleEffect;
+import com.badlogic.gdx.graphics.g2d.ParticleEffectPool;
+import com.badlogic.gdx.graphics.g2d.ParticleEffectPool.PooledEffect;
 import com.badlogic.gdx.graphics.g2d.PolygonSpriteBatch;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
+import com.badlogic.gdx.math.MathUtils;
+import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.math.Vector2;
+import com.badlogic.gdx.math.Vector3;
+import com.badlogic.gdx.physics.box2d.Body;
 import com.badlogic.gdx.physics.box2d.Box2DDebugRenderer;
 import com.badlogic.gdx.physics.box2d.World;
+import com.badlogic.gdx.utils.Align;
+import com.badlogic.gdx.utils.Array;
 
 import net.dermetfan.gdx.graphics.g2d.Box2DSprite;
+import net.dermetfan.gdx.utils.ArrayUtils;
 
 public class Ld35 extends ApplicationAdapter {
 	private static final String	TAG				= Ld35.class.getName();
 
-	public final static int		VELOCITY_ITERS	= 8;
-	public final static int		POSITION_ITERS	= 6;
+	public final static int		VELOCITY_ITERS	= 3;
+	public final static int		POSITION_ITERS	= 2;
 	public final static int		MAX_FPS			= 60;
 	public final static int		MIN_FPS			= 15;
 	public final static float	MAX_STEPS		= 1f + MAX_FPS / MIN_FPS;
 	public final static float	TIME_STEP		= 1f / MAX_FPS;
-	public final static float	UNIT_SCALE		= 1f / 40f;
+	public static float			UNIT_SCALE		= 10f / 400f;
 
+	public final static int		STATE_LOGO		= 1;
+	public final static int		STATE_INTRO		= 2;
+	public final static int		STATE_GAME		= 3;
+
+	// int currentState = STATE_LOGO;
+	int							currentState	= STATE_GAME;
 	SpriteBatch					batch;
 	PolygonSpriteBatch			polyBatch;
 	ShapeRenderer				shapeRenderer;
@@ -36,17 +52,31 @@ public class Ld35 extends ApplicationAdapter {
 	World						world;
 	BitmapFont					font;
 	PhysicsFactory				phyFac;
+	ShapeJson					mission;
 
-	public boolean				debugEnabled	= true;
+	public boolean				debugEnabled	= false;
+	public Rectangle			trunkRect;
+	public float				leafRadius		= 7f / 40f;
 
 	private ParticleEffect		cutLeafEffect;
+	private ParticleEffectPool	cutLeafEffectPool;
+	private Array<PooledEffect>	effects			= new Array<PooledEffect>();
+
 	private boolean				cutHedge		= false;
 	private boolean				shearsOpen		= false;
 	private Vector2				shearsPosition	= new Vector2();
 	private Vector2				shearsTarget	= new Vector2();
+	private Vector3				cutVec			= new Vector3();
+	private Vector3				camTargetPos;
+	private Vector2				bgPos			= new Vector2(0, 0);
+	private Vector2				bgTargetPos		= new Vector2(0, 0);
+	private boolean				showDesc		= false;
 
 	private TextureRegion		txShearsOpen;
 	private TextureRegion		txShearsClosed;
+	private TextureRegion		txBg;
+
+	private int[][]				hedgeMatrix;
 
 	@Override
 	public void create() {
@@ -56,6 +86,7 @@ public class Ld35 extends ApplicationAdapter {
 		polyBatch = new PolygonSpriteBatch();
 		box2dRenderer = new Box2DDebugRenderer();
 		shapeRenderer = new ShapeRenderer();
+		shapeRenderer.setAutoShapeType(true);
 
 		Assets.instance.init();
 		Assets.instance.loadAll();
@@ -65,9 +96,12 @@ public class Ld35 extends ApplicationAdapter {
 		cutLeafEffect = new ParticleEffect();
 		cutLeafEffect.load(Gdx.files.internal("particles/cutleafs.fx"), Assets.instance.atlas);
 		cutLeafEffect.scaleEffect(UNIT_SCALE);
+		cutLeafEffectPool = new ParticleEffectPool(cutLeafEffect, 5, 30);
 
 		txShearsOpen = Assets.instance.skin.get(Assets.txShearsOpen, TextureRegion.class);
 		txShearsClosed = Assets.instance.skin.get(Assets.txShearsClosed, TextureRegion.class);
+		txBg = Assets.instance.skin.get(Assets.txBg, TextureRegion.class);
+		font = Assets.instance.skin.getFont("default-font");
 
 		// Box2DSprite.setZComparator(new Comparator<Box2DSprite>() {
 		// @Override
@@ -85,31 +119,45 @@ public class Ld35 extends ApplicationAdapter {
 		// txLeafs = Assets.instance.skin.get(Assets.txLeafs, TextureRegion.class);
 		// txTrunk = Assets.instance.skin.get(Assets.txTrunk, TextureRegion.class);
 
-		reset();
-	}
-
-	private void reset() {
 		cam = new OrthographicCamera(Gdx.graphics.getWidth() * UNIT_SCALE, Gdx.graphics.getHeight() * UNIT_SCALE);
-		cam.translate(0, Gdx.graphics.getHeight() * UNIT_SCALE * 0.5f);
+		// cam.translate(0, Gdx.graphics.getHeight() * UNIT_SCALE * 0.6f);
 		// cam.zoom = 0.5f;
-		cam.update();
+		// cam.update();
 		Gdx.app.log(TAG, "Gdx.graphics.getWidth() " + Gdx.graphics.getWidth());
 		Gdx.app.log(TAG, "Gdx.graphics.getHeight() " + Gdx.graphics.getHeight());
 		camPix = new OrthographicCamera(Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
-		camPix.translate(Gdx.graphics.getWidth() / 2f, Gdx.graphics.getHeight() / 2f);
-		camPix.update();
+		// camPix.translate(Gdx.graphics.getWidth() / 2f, Gdx.graphics.getHeight() / 2f);
+		// camPix.update();
+
+		mission = Assets.instance.assetsManager.get(Assets.shapeDollar, ShapeJson.class);
+		Gdx.app.log(TAG, "Mission: " + mission);
+
+		reset();
+	}
+
+	public void reset() {
+		cam.position.x = 0;
+		cam.position.y = 0;
+		cam.translate(Gdx.graphics.getHeight() * UNIT_SCALE * 0.3f, Gdx.graphics.getHeight() * UNIT_SCALE * 0.6f);
+		cam.update();
 
 		if (world != null) {
 			world.dispose();
 		}
-		world = new World(new Vector2(0, -10f), false);
+		world = new World(new Vector2(0, -10f), true);
 
 		if (phyFac != null) {
 			phyFac.dispose();
 		}
-		phyFac = new PhysicsFactory(world);
+		phyFac = new PhysicsFactory(world, this);
 		phyFac.createFloor();
-		phyFac.createBush(0f, 0f, UNIT_SCALE * 80f, UNIT_SCALE * 160f);
+		phyFac.createBush(0f, 0f, 3f, 4f);
+
+		// Reset all effects:
+		for (int i = effects.size - 1; i >= 0; i--) {
+			effects.get(i).free(); // free all the effects back to the pool
+		}
+		effects.clear();
 	}
 
 	@Override
@@ -119,10 +167,41 @@ public class Ld35 extends ApplicationAdapter {
 		Gdx.gl.glClearColor(0, 0, 0, 1);
 		Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
-		{
+		{ // BG
+			batch.setProjectionMatrix(camPix.combined);
+			batch.setColor(Color.WHITE);
+			batch.begin();
+			batch.draw(txBg, bgPos.x - camPix.viewportWidth / 2, bgPos.y - camPix.viewportHeight / 2, camPix.viewportWidth * 3f,
+					camPix.viewportHeight);
+			if (mission != null && currentState == STATE_GAME && MathUtils.isEqual(bgPos.x, bgTargetPos.x)) {
+				batch.setColor(Color.WHITE);
+				if (showDesc) {
+					font.draw(batch, mission.desc, camPix.viewportWidth * 0.05f, -30 + camPix.viewportHeight / 2f,
+							camPix.viewportWidth * 0.4f, Align.center, true);
+				} else {
+					font.draw(batch, mission.shapeText(), camPix.viewportWidth * 0.05f, -30 + camPix.viewportHeight / 2f,
+							camPix.viewportWidth * 0.4f, Align.center, true);
+				}
+			}
+
+			batch.end();
+		}
+
+		if (currentState == STATE_GAME && MathUtils.isEqual(bgPos.x, bgTargetPos.x)) { // draw bush
+
 			batch.setProjectionMatrix(cam.combined);
 			batch.begin();
+
 			Box2DSprite.draw(batch, world);
+
+			for (int i = effects.size - 1; i >= 0; i--) {
+				final PooledEffect effect = effects.get(i);
+				effect.draw(batch, delta);
+				if (effect.isComplete()) {
+					effect.free();
+					effects.removeIndex(i);
+				}
+			}
 			batch.end();
 		}
 
@@ -130,29 +209,34 @@ public class Ld35 extends ApplicationAdapter {
 			batch.setProjectionMatrix(camPix.combined);
 			batch.begin();
 
+			final int shearsOffsetX = -18;
+			final int shearsOffsetY = -14;
 			if (shearsOpen) {
-				batch.draw(txShearsOpen, shearsPosition.x - 10, camPix.viewportHeight - shearsPosition.y - 10,
-						txShearsOpen.getRegionWidth() / 2f, txShearsOpen.getRegionHeight() / 2f, txShearsOpen.getRegionWidth(),
-						txShearsOpen.getRegionHeight(), 2f, 2f, -shearsTarget.cpy().sub(shearsPosition).angle() - 45);
-				Gdx.app.log(TAG, "shearsPosition " + shearsPosition + " - shearsTarget " + shearsTarget + " - Shears angle "
-						+ shearsTarget.cpy().sub(shearsPosition).angle());
+				batch.draw(txShearsOpen, shearsPosition.x + shearsOffsetX - camPix.viewportWidth / 2f,
+						camPix.viewportHeight / 2f - shearsPosition.y + shearsOffsetY, txShearsOpen.getRegionWidth() / 2f,
+						txShearsOpen.getRegionHeight() / 2f, txShearsOpen.getRegionWidth(), txShearsOpen.getRegionHeight(), 2f, 2f,
+						-shearsTarget.cpy().sub(shearsPosition).angle() - 45);
+				// Gdx.app.log(TAG, "shearsPosition " + shearsPosition + " - shearsTarget " + shearsTarget + " - Shears angle "
+				// + shearsTarget.cpy().sub(shearsPosition).angle());
 			} else {
 
-				batch.draw(txShearsClosed, shearsPosition.x - 10, camPix.viewportHeight - shearsPosition.y - 10,
-						txShearsOpen.getRegionWidth() / 2f, txShearsOpen.getRegionHeight() / 2f, txShearsOpen.getRegionWidth(),
-						txShearsOpen.getRegionHeight(), 2f, 2f, 0);
+				batch.draw(txShearsClosed, shearsPosition.x + shearsOffsetX - camPix.viewportWidth / 2f,
+						camPix.viewportHeight / 2f - shearsPosition.y + shearsOffsetY, txShearsOpen.getRegionWidth() / 2f,
+						txShearsOpen.getRegionHeight() / 2f, txShearsOpen.getRegionWidth(), txShearsOpen.getRegionHeight(), 2f, 2f, 0);
 			}
-
-			if (cutHedge) {
-				Gdx.app.log(TAG, "Draw particle effect");
-				cutHedge = false;
-				cutLeafEffect.setPosition(shearsPosition.x, shearsPosition.y);
-				cutLeafEffect.reset();
-				cutLeafEffect.start();
-			}
-			cutLeafEffect.draw(batch, delta);
 
 			batch.end();
+		}
+
+		{ // cutting line
+			if (shearsOpen) {
+				shapeRenderer.setProjectionMatrix(camPix.combined);
+				shapeRenderer.setColor(Color.RED);
+				shapeRenderer.begin();
+				shapeRenderer.line(shearsPosition.x - camPix.viewportWidth / 2f, camPix.viewportHeight / 2f - shearsPosition.y, 0,
+						Gdx.input.getX() - camPix.viewportWidth / 2f, camPix.viewportHeight / 2f - Gdx.input.getY(), 0);
+				shapeRenderer.end();
+			}
 		}
 
 		if (debugEnabled) {
@@ -162,6 +246,14 @@ public class Ld35 extends ApplicationAdapter {
 
 	private void update() {
 		world.step(TIME_STEP, VELOCITY_ITERS, POSITION_ITERS);
+
+		if (!MathUtils.isEqual(bgPos.x, bgTargetPos.x)) {
+			if (bgPos.x > bgTargetPos.x) {
+				bgPos.x -= 10;
+			} else {
+				bgPos.x += 10;
+			}
+		}
 	}
 
 	@Override
@@ -212,5 +304,216 @@ public class Ld35 extends ApplicationAdapter {
 
 	public void setShearsTarget(Vector2 shearsTarget) {
 		this.shearsTarget = shearsTarget;
+	}
+
+	public void leafEffect(Vector2 worldCenter) {
+		final PooledEffect effect = cutLeafEffectPool.obtain();
+		effect.setPosition(worldCenter.x, worldCenter.y);
+		effects.add(effect);
+	}
+
+	public void cutHedgeMatrix(Leaf leaf) {
+		hedgeMatrix[leaf.y][leaf.x] = 0;
+		Gdx.app.log(TAG, "HedgeMatrix updated " + leaf);
+		// isConnectedToTrunk(leaf);
+		for (int y = hedgeMatrix.length - 1; y >= 0; y--) {
+			Gdx.app.log(TAG, ArrayUtils.toString(hedgeMatrix[y]));
+		}
+	}
+
+	public void checkTrunkConnections() {
+		for (int y = 0; y < 14; y++) {
+			for (int x = 7; x < 11; x++) {
+				if (hedgeMatrix[y][x] != 0) {
+					hedgeMatrix[y][x] = 3;
+				}
+			}
+		}
+		for (int x = 6; x < 12; x++) {
+			isConnectedToTrunk(x, 14);
+		}
+		for (int y = 0; y < 14; y++) {
+			isConnectedToTrunk(6, y);
+		}
+		for (int y = 0; y < 14; y++) {
+			isConnectedToTrunk(11, y);
+		}
+		setVisitedLeafs(3);
+
+		for (int y = 0; y < hedgeMatrix.length; y++) {
+			for (int x = 0; x < hedgeMatrix[y].length; x++) {
+				if (hedgeMatrix[y][x] == 1) {
+					hedgeMatrix[y][x] = 0;
+				} else if (hedgeMatrix[y][x] > 1) {
+					hedgeMatrix[y][x] = 1;
+				}
+			}
+		}
+		for (int y = hedgeMatrix.length - 1; y >= 0; y--) {
+			Gdx.app.log(TAG, ArrayUtils.toString(hedgeMatrix[y]));
+		}
+	}
+
+	private boolean isConnectedToTrunk(Leaf leaf) {
+		boolean connected = false;
+		if (!isConnectedToTrunk(leaf.x, leaf.y - 1)) {
+			setVisitedLeafs(0);
+		} else {
+			setVisitedLeafs(3);
+			connected = true;
+		}
+		if (!isConnectedToTrunk(leaf.x + 1, leaf.y)) {
+			setVisitedLeafs(0);
+		} else {
+			setVisitedLeafs(3);
+			connected = true;
+		}
+		if (!isConnectedToTrunk(leaf.x - 1, leaf.y)) {
+			setVisitedLeafs(0);
+		} else {
+			setVisitedLeafs(3);
+			connected = true;
+		}
+		if (!isConnectedToTrunk(leaf.x, leaf.y + 1)) {
+			setVisitedLeafs(0);
+		} else {
+			setVisitedLeafs(3);
+			connected = true;
+		}
+
+		for (int y = 0; y < hedgeMatrix.length; y++) {
+			for (int x = 0; x < hedgeMatrix[y].length; x++) {
+				if (connected) {
+					if (hedgeMatrix[y][x] > 0) {
+						hedgeMatrix[y][x] = 1;
+					}
+				} else {
+					hedgeMatrix[y][x] = 0;
+				}
+			}
+		}
+		return connected;
+	}
+
+	private void setVisitedLeafs(int value) {
+		for (int y = 0; y < hedgeMatrix.length; y++) {
+			for (int x = 0; x < hedgeMatrix[y].length; x++) {
+				if (hedgeMatrix[y][x] == 2) {
+					hedgeMatrix[y][x] = value;
+				}
+			}
+		}
+	}
+
+	private boolean isConnectedToTrunk(final int x, final int y) {
+		// Gdx.app.log(TAG, "Checking if connected to trunk (" + x + ", " + y + ")");
+		if (x < 0 || x >= hedgeMatrix[0].length || y < 0 || y >= hedgeMatrix.length) {
+			// Gdx.app.log(TAG, "Out of bounds (" + x + ", " + y + ")");
+			return false;
+		} else if (hedgeMatrix[y][x] == 0) {
+			// Gdx.app.log(TAG, "Not connected to trunk (" + x + ", " + y + ")");
+			return false;
+		} else if (hedgeMatrix[y][x] == 3) {
+			// Gdx.app.log(TAG, "Connected via connected (" + x + ", " + y + ")");
+			return true;
+		} else if (hedgeMatrix[y][x] == 2) {
+			// Gdx.app.log(TAG, "Already checked (" + x + ", " + y + ")");
+			return false;
+		} else {
+			hedgeMatrix[y][x] = 2;
+			if (isTrunk(x, y) && hedgeMatrix[y][x] > 0) {
+				// Gdx.app.log(TAG, "Is intact trunk (" + x + ", " + y + ")");
+				return true;
+			}
+			boolean connected = false;
+			connected = isConnectedToTrunk(x, y - 1) || connected;
+			connected = isConnectedToTrunk(x - 1, y) || connected;
+			connected = isConnectedToTrunk(x + 1, y) || connected;
+			connected = isConnectedToTrunk(x, y + 1) || connected;
+			if (connected) {
+				hedgeMatrix[y][x] = 3;
+				// Gdx.app.log(TAG, "Connected to trunk (" + x + ", " + y + ")");
+				return true;
+			}
+			// Gdx.app.log(TAG, "Not connected to trunk (" + x + ", " + y + ")");
+			// hedgeMatrix[y][x] = 0;
+			return false;
+		}
+	}
+
+	// private boolean isConnectedToTrunk(final int x, final int y) {
+	// Gdx.app.log(TAG, "Checking if connected to trunk (" + x + ", " + y + ")");
+	// if (x < 0 || x >= hedgeMatrix[0].length || y < 0 || y >= hedgeMatrix.length) {
+	// Gdx.app.log(TAG, "Out of bounds (" + x + ", " + y + ")");
+	// return false;
+	// } else if (hedgeMatrix[y][x] == 0) {
+	// Gdx.app.log(TAG, "Not connected to trunk (" + x + ", " + y + ")");
+	// return false;
+	// } else if (hedgeMatrix[y][x] == 3) {
+	// Gdx.app.log(TAG, "Is connected via connected (" + x + ", " + y + ")");
+	// return true;
+	// } else if (hedgeMatrix[y][x] == 2) {
+	// Gdx.app.log(TAG, "Already checked (" + x + ", " + y + ")");
+	// return false;
+	// } else {
+	// hedgeMatrix[y][x] = 2;
+	// if (isTrunk(x, y) && hedgeMatrix[y][x] > 0) {
+	// Gdx.app.log(TAG, "Is intact trunk (" + x + ", " + y + ")");
+	// return true;
+	// }
+	// if (isConnectedToTrunk(x, y - 1) || isConnectedToTrunk(x - 1, y) || isConnectedToTrunk(x + 1, y)
+	// || isConnectedToTrunk(x, y + 1)) {
+	// hedgeMatrix[y][x] = 3;
+	// Gdx.app.log(TAG, "Connected to trunk (" + x + ", " + y + ")");
+	// return true;
+	// }
+	// Gdx.app.log(TAG, "Not connected to trunk (" + x + ", " + y + ")");
+	// hedgeMatrix[y][x] = 0;
+	// return false;
+	// }
+	// }
+
+	private boolean isTrunk(int x, int y) {
+		if ((x >= 7 && x <= 10) && (y <= 13)) {
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+	public void setHedgeMatrix(Array<Array<Body>> bodies) {
+		hedgeMatrix = new int[bodies.size][bodies.first().size];
+		for (int y = 0; y < bodies.size; y++) {
+			final Array<Body> row = bodies.get(y);
+			for (int x = 0; x < row.size; x++) {
+				hedgeMatrix[y][x] = 1;
+			}
+		}
+	}
+
+	public void setCutVec(Vector3 cutVec) {
+		this.cutVec = cutVec;
+	}
+
+	public void incState() {
+		if (currentState != STATE_GAME) {
+			currentState++;
+			bgTargetPos.x -= 800;
+			// camTargetPos =
+		}
+	}
+
+	@Override
+	public void resize(int width, int height) {
+		super.resize(width, height);
+
+		UNIT_SCALE = 10f / (new Float(width) / 2f);
+		cam.viewportWidth = width * UNIT_SCALE;
+		cam.viewportHeight = height * UNIT_SCALE;
+		cam.update();
+
+		camPix.viewportWidth = width;
+		camPix.viewportHeight = height;
+		camPix.update();
 	}
 }

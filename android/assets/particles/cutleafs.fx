@@ -2,16 +2,16 @@ Untitled
 - Delay -
 active: false
 - Duration - 
-lowMin: 178.0
-lowMax: 178.0
+lowMin: 175.0
+lowMax: 175.0
 - Count - 
 min: 0
 max: 200
 - Emission - 
 lowMin: 0.0
 lowMax: 0.0
-highMin: 192.0
-highMax: 192.0
+highMin: 63.0
+highMax: 63.0
 relative: false
 scalingCount: 2
 scaling0: 1.0
@@ -22,16 +22,16 @@ timeline1: 1.0
 - Life - 
 lowMin: 0.0
 lowMax: 0.0
-highMin: 437.0
-highMax: 437.0
+highMin: 804.0
+highMax: 804.0
 relative: false
 scalingCount: 3
 scaling0: 1.0
-scaling1: 1.0
-scaling2: 1.0
+scaling1: 0.60784316
+scaling2: 0.0
 timelineCount: 3
 timeline0: 0.0
-timeline1: 0.66
+timeline1: 0.39041096
 timeline2: 1.0
 - Life Offset - 
 active: false
@@ -40,12 +40,14 @@ active: false
 - Y Offset - 
 active: false
 - Spawn Shape - 
-shape: line
+shape: ellipse
+edges: true
+side: both
 - Spawn Width - 
 lowMin: 0.0
 lowMax: 0.0
-highMin: 42.0
-highMax: 42.0
+highMin: 12.0
+highMax: 12.0
 relative: false
 scalingCount: 1
 scaling0: 1.0
@@ -54,8 +56,8 @@ timeline0: 0.0
 - Spawn Height - 
 lowMin: 0.0
 lowMax: 0.0
-highMin: 0.0
-highMax: 0.0
+highMin: 10.0
+highMax: 10.0
 relative: false
 scalingCount: 1
 scaling0: 1.0
@@ -79,8 +81,8 @@ timeline2: 1.0
 active: true
 lowMin: 0.0
 lowMax: 0.0
-highMin: 30.0
-highMax: 300.0
+highMin: 70.0
+highMax: 150.0
 relative: false
 scalingCount: 3
 scaling0: 0.0
@@ -111,8 +113,8 @@ timeline2: 1.0
 active: false
 - Gravity - 
 active: true
-lowMin: 0.0
-lowMax: 0.0
+lowMin: 41.0
+lowMax: 41.0
 highMin: -70.0
 highMax: -70.0
 relative: false
@@ -130,16 +132,16 @@ colors2: 0.0627451
 colors3: 0.24705882
 colors4: 0.3254902
 colors5: 0.19215687
-colors6: 0.22745098
-colors7: 0.3254902
-colors8: 0.0627451
+colors6: 0.32941177
+colors7: 0.45882353
+colors8: 0.09019608
 colors9: 0.81960785
 colors10: 0.8980392
 colors11: 0.20784314
 timelineCount: 4
 timeline0: 0.0
 timeline1: 0.01
-timeline2: 0.17900172
+timeline2: 0.48192772
 timeline3: 1.0
 - Transparency - 
 lowMin: 0.0

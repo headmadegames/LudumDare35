@@ -1,15 +1,21 @@
 package headmade.ld35;
 
-import com.badlogic.gdx.physics.box2d.Body;
-
 public class Leaf {
 
 	private static final String	TAG	= Leaf.class.getName();
 
-	private Body				body;
+	public int					x;
+	public int					y;
 
-	public Leaf(Body body) {
+	public Leaf(int x, int y) {
 		super();
-		this.body = body;
+		this.x = x;
+		this.y = y;
 	}
+
+	@Override
+	public String toString() {
+		return "Leaf [x=" + x + ", y=" + y + "]";
+	}
+
 }

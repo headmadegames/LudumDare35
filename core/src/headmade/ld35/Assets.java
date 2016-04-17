@@ -47,8 +47,12 @@ public class Assets implements Disposable, AssetErrorListener {
 	public static final String			txLogo			= "logo";
 	public static final String			txShearsClosed	= "shearsClosed";
 	public static final String			txShearsOpen	= "shearsOpen";
+	public static final String			txLeafsWhite	= "leafswhite";
+	public static final String			txBg			= "bg";
+	public static final String			txBlueprint		= "blueprint";
 	// public static final String[] txLeafs = { "leaf01", "leaf02", "leaf03", "leaf04", "leaf05" };
 	// public static final String[] txBranches = { "branch01", "branch02", "branch03", "branch04", "branch05" };
+	public static final String			shapeDollar		= "shapes/dollar.json";
 
 	public static final Assets			instance		= new Assets();										// Singleton
 
@@ -96,6 +100,7 @@ public class Assets implements Disposable, AssetErrorListener {
 	public void init() {
 		Gdx.app.debug(TAG, "Init minimal assets...");
 
+		assetsManager.setLoader(ShapeJson.class, new ShapeJsonAssetLoader(new InternalFileHandleResolver()));
 		assetsManager.load(HEADMADE_LOGO, Texture.class);
 
 		assetsManager.finishLoading();
@@ -115,6 +120,8 @@ public class Assets implements Disposable, AssetErrorListener {
 
 		assetsManager.load(GAME_ATLAS, TextureAtlas.class);
 		assetsManager.load(skinPath, Skin.class, skinParameter);
+
+		assetsManager.load(shapeDollar, ShapeJson.class);
 
 	}
 

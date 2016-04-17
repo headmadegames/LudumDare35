@@ -17,8 +17,8 @@ public class Ld35Launcher {
 	public static void main(String[] arg) {
 		if (rebuildAtlas) {
 			final Settings settings = new Settings();
-			settings.maxWidth = 2048;
-			settings.maxHeight = 2048;
+			settings.maxWidth = 4096;
+			settings.maxHeight = 4096;
 			settings.debug = drawDebugOutline;
 			// settings.duplicatePadding = true;
 			// settings.grid = true;
@@ -40,6 +40,7 @@ public class Ld35Launcher {
 		config.width = 800;
 		config.height = 480;
 		config.samples = 4;
+		config.resizable = false;
 		new LwjglApplication(new Ld35(), config);
 	}
 }

@@ -12,7 +12,6 @@ import com.badlogic.gdx.physics.box2d.JointEdge;
 import com.badlogic.gdx.physics.box2d.RayCastCallback;
 import com.badlogic.gdx.utils.Array;
 
-import net.dermetfan.gdx.graphics.g2d.Box2DSprite;
 import net.dermetfan.gdx.physics.box2d.Box2DUtils;
 
 public class Ld35InputProcessor implements InputProcessor {
@@ -23,7 +22,9 @@ public class Ld35InputProcessor implements InputProcessor {
 	private Ld35				game;
 	private Vector3				touchDownPoint;
 
-	private float				cuttingLength	= 60f * Ld35.UNIT_SCALE;
+	private float				cuttingLength	= 30f * Ld35.UNIT_SCALE;
+
+	private Vector2				cutVec;
 
 	public Ld35InputProcessor(Ld35 ld35) {
 		this.game = ld35;
@@ -48,8 +49,13 @@ public class Ld35InputProcessor implements InputProcessor {
 			game.cam.translate(0f, -1f);
 			game.cam.update();
 			return true;
+		} else if (keycode == Keys.SPACE) {
+			game.checkTrunkConnections();
+			return true;
 		} else if (keycode == Keys.R) {
-			game.create();
+			if (game.currentState == game.STATE_GAME) {
+				game.reset();
+			}
 			return true;
 		}
 		// }
@@ -72,6 +78,8 @@ public class Ld35InputProcessor implements InputProcessor {
 
 	@Override
 	public boolean touchDown(int screenX, int screenY, int pointer, int button) {
+		game.incState();
+
 		touchDownPoint = game.cam.unproject(new Vector3(screenX, screenY, 0));
 		Gdx.app.log(TAG, "Mouse clicked at " + touchDownPoint);
 
@@ -90,33 +98,44 @@ public class Ld35InputProcessor implements InputProcessor {
 		mouseDown = false;
 
 		game.setShearsOpen(false);
-		if (touchDownPoint != null && touchUpPoint.dst2(touchDownPoint) > 0.001f) {
-			game.getShearsTarget().x = screenX;
-			game.getShearsTarget().y = screenY;
-			final RayCastCallback callback = new RayCastCallback() {
-				@Override
-				public float reportRayFixture(Fixture fixture, Vector2 point, Vector2 normal, float fraction) {
-					final Body body = fixture.getBody();
-					if (body.getUserData() != null && body.getUserData() instanceof Box2DSprite
-							&& ((Box2DSprite) body.getUserData()).getScaleX() > 1.1f) {
-						final Array<JointEdge> joints = fixture.getBody().getJointList();
-						for (final JointEdge jointEdge : joints) {
-							game.world.destroyJoint(jointEdge.joint);
-						}
+		final Vector2 touchDown = new Vector2(touchDownPoint.x, touchDownPoint.y);
+		if (game.currentState == game.STATE_GAME && touchDownPoint != null) {
+			if (touchUpPoint.dst2(touchDownPoint) > 0.1f) {
+				game.getShearsTarget().x = screenX;
+				game.getShearsTarget().y = screenY;
 
-						// destroy leafs
-						Box2DUtils.destroyFixtures(body);
-						game.world.destroyBody(body);
+				final Vector2 touchUp = new Vector2(touchUpPoint.x, touchUpPoint.y);
+				// cutVec = touchUp.cpy().sub(touchDown).nor().scl(cuttingLength);
+				cutVec = touchUp.cpy().sub(touchDown);
+				game.setCutVec(game.cam.project(new Vector3(cutVec.x, cutVec.y, 0f)));
+			}
+			if (cutVec != null) {
+
+				final RayCastCallback callback = new RayCastCallback() {
+					@Override
+					public float reportRayFixture(Fixture fixture, Vector2 point, Vector2 normal, float fraction) {
+						final Body body = fixture.getBody();
+						if (body.getUserData() != null && body.getUserData() instanceof Leaf) {
+							final Array<JointEdge> joints = fixture.getBody().getJointList();
+							for (final JointEdge jointEdge : joints) {
+								game.world.destroyJoint(jointEdge.joint);
+								jointEdge.other.applyForce(0, 0.00001f, touchUpPoint.x, touchUpPoint.y, true);
+							}
+
+							// destroy leafs
+							game.cutHedgeMatrix(((Leaf) body.getUserData()));
+							game.leafEffect(body.getWorldCenter());
+							Box2DUtils.destroyFixtures(body);
+							game.world.destroyBody(body);
+						}
+						return 1;
 					}
-					return 1;
-				}
-			};
-			final Vector2 touchDown = new Vector2(touchDownPoint.x, touchDownPoint.y);
-			final Vector2 touchUp = new Vector2(touchUpPoint.x, touchUpPoint.y);
-			final Vector2 cutVec = touchUp.cpy().sub(touchDown).nor().scl(cuttingLength).add(touchDown);
-			// Gdx.app.log(TAG, "Cut Vec " + cutVec + " length " cutVec.len());
-			game.world.rayCast(callback, touchDown, cutVec);
+				};
+				// Gdx.app.log(TAG, "Cut Vec " + cutVec + " length " cutVec.len());
+				game.world.rayCast(callback, touchDown, cutVec.cpy().add(touchDown));
+			}
 		}
+
 		return false;
 	}
 
@@ -124,7 +143,7 @@ public class Ld35InputProcessor implements InputProcessor {
 	public boolean touchDragged(int screenX, int screenY, int pointer) {
 		game.getShearsTarget().x = screenX;
 		game.getShearsTarget().y = screenY;
-		Gdx.app.log(TAG, "Shears Target " + game.getShearsTarget());
+		// Gdx.app.log(TAG, "Shears Target " + game.getShearsTarget());
 		return false;
 	}
 
