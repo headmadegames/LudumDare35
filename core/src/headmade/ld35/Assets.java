@@ -37,8 +37,16 @@ public class Assets implements Disposable, AssetErrorListener {
 	public static final SkinParameter	skinParameter	= new SkinLoader.SkinParameter(Assets.GAME_ATLAS);
 	public static final String			skinPath		= Assets.PACKS_BASE + Assets.PACK + ".json";
 	public static final String			music			= "music/bg.ogg";
-	public static final String			sndExplosion	= "sounds/explosion.wav";
-	public static final String			sndJet			= "sounds/jet.wav";
+	public static final String			sndCash			= "audio/cash.wav";
+	public static final String			sndOpen			= "audio/open.wav";
+	public static final String			sndCut			= "audio/cut.wav";
+	public static final String			txLeaf			= "leaf";
+	public static final String[]		txLeafs			= { "leafs", "leafs2", "leafs3", "leafs4" };
+	public static final String			txTrunk			= "trunk";
+	public static final String			txPot			= "pot";
+	public static final String			txLogo			= "logo";
+	public static final String			txShearsClosed	= "shearsClosed";
+	public static final String			txShearsOpen	= "shearsOpen";
 	// public static final String[] txLeafs = { "leaf01", "leaf02", "leaf03", "leaf04", "leaf05" };
 	// public static final String[] txBranches = { "branch01", "branch02", "branch03", "branch04", "branch05" };
 
@@ -101,8 +109,9 @@ public class Assets implements Disposable, AssetErrorListener {
 		Gdx.app.debug(TAG, "Init assets...");
 
 		// assetsManager.load(music, Music.class);
-		// assetsManager.load(sndExplosion, Sound.class);
-		// assetsManager.load(sndJet, Sound.class);
+		assetsManager.load(sndOpen, Sound.class);
+		assetsManager.load(sndCut, Sound.class);
+		assetsManager.load(sndCash, Sound.class);
 
 		assetsManager.load(GAME_ATLAS, TextureAtlas.class);
 		assetsManager.load(skinPath, Skin.class, skinParameter);

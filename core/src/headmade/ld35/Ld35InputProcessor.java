@@ -12,14 +12,18 @@ import com.badlogic.gdx.physics.box2d.JointEdge;
 import com.badlogic.gdx.physics.box2d.RayCastCallback;
 import com.badlogic.gdx.utils.Array;
 
+import net.dermetfan.gdx.graphics.g2d.Box2DSprite;
 import net.dermetfan.gdx.physics.box2d.Box2DUtils;
 
 public class Ld35InputProcessor implements InputProcessor {
-	private static final String	TAG	= Ld35InputProcessor.class.getName();
+	private static final String	TAG				= Ld35InputProcessor.class.getName();
+
+	public static boolean		mouseDown		= false;
 
 	private Ld35				game;
-
 	private Vector3				touchDownPoint;
+
+	private float				cuttingLength	= 60f * Ld35.UNIT_SCALE;
 
 	public Ld35InputProcessor(Ld35 ld35) {
 		this.game = ld35;
@@ -27,30 +31,31 @@ public class Ld35InputProcessor implements InputProcessor {
 
 	@Override
 	public boolean keyDown(int keycode) {
-		if (game.debugEnabled) {
-			if (keycode == Keys.LEFT || keycode == Keys.A) {
-				game.cam.translate(-1f, 0f);
-				game.cam.update();
-				return true;
-			} else if (keycode == Keys.RIGHT || keycode == Keys.D) {
-				game.cam.translate(1f, 0f);
-				game.cam.update();
-				return true;
-			} else if (keycode == Keys.UP || keycode == Keys.W) {
-				game.cam.translate(0f, 1f);
-				game.cam.update();
-				return true;
-			} else if (keycode == Keys.DOWN || keycode == Keys.S) {
-				game.cam.translate(0f, -1f);
-				game.cam.update();
-				return true;
-			} else if (keycode == Keys.R) {
-				game.create();
-				return true;
-			} else if (keycode == Keys.F12) {
-				game.debugEnabled = !game.debugEnabled;
-				return true;
-			}
+		// if (game.debugEnabled) {
+		if (keycode == Keys.LEFT || keycode == Keys.A) {
+			game.cam.translate(-1f, 0f);
+			game.cam.update();
+			return true;
+		} else if (keycode == Keys.RIGHT || keycode == Keys.D) {
+			game.cam.translate(1f, 0f);
+			game.cam.update();
+			return true;
+		} else if (keycode == Keys.UP || keycode == Keys.W) {
+			game.cam.translate(0f, 1f);
+			game.cam.update();
+			return true;
+		} else if (keycode == Keys.DOWN || keycode == Keys.S) {
+			game.cam.translate(0f, -1f);
+			game.cam.update();
+			return true;
+		} else if (keycode == Keys.R) {
+			game.create();
+			return true;
+		}
+		// }
+		if (keycode == Keys.F12) {
+			game.debugEnabled = !game.debugEnabled;
+			return true;
 		}
 		return false;
 	}
@@ -70,18 +75,30 @@ public class Ld35InputProcessor implements InputProcessor {
 		touchDownPoint = game.cam.unproject(new Vector3(screenX, screenY, 0));
 		Gdx.app.log(TAG, "Mouse clicked at " + touchDownPoint);
 
+		mouseDown = true;
+		game.setShearsOpen(true);
+		game.getShearsPosition().x = screenX;
+		game.getShearsPosition().y = screenY;
+		Gdx.app.log(TAG, "Shears Position " + game.getShearsPosition());
+
 		return true;
 	}
 
 	@Override
 	public boolean touchUp(int screenX, int screenY, int pointer, int button) {
 		final Vector3 touchUpPoint = game.cam.unproject(new Vector3(screenX, screenY, 0));
-		if (touchDownPoint != null && touchUpPoint.dst2(touchDownPoint) > 0.1f) {
+		mouseDown = false;
+
+		game.setShearsOpen(false);
+		if (touchDownPoint != null && touchUpPoint.dst2(touchDownPoint) > 0.001f) {
+			game.getShearsTarget().x = screenX;
+			game.getShearsTarget().y = screenY;
 			final RayCastCallback callback = new RayCastCallback() {
 				@Override
 				public float reportRayFixture(Fixture fixture, Vector2 point, Vector2 normal, float fraction) {
 					final Body body = fixture.getBody();
-					if (body.getUserData() != null && body.getUserData() instanceof Leaf) {
+					if (body.getUserData() != null && body.getUserData() instanceof Box2DSprite
+							&& ((Box2DSprite) body.getUserData()).getScaleX() > 1.1f) {
 						final Array<JointEdge> joints = fixture.getBody().getJointList();
 						for (final JointEdge jointEdge : joints) {
 							game.world.destroyJoint(jointEdge.joint);
@@ -94,30 +111,41 @@ public class Ld35InputProcessor implements InputProcessor {
 					return 1;
 				}
 			};
-			// game.world.QueryAABB(callback, lowerX, lowerY, upperX, upperY);
-			game.world.rayCast(callback, new Vector2(touchDownPoint.x, touchDownPoint.y), new Vector2(touchUpPoint.x, touchUpPoint.y));
+			final Vector2 touchDown = new Vector2(touchDownPoint.x, touchDownPoint.y);
+			final Vector2 touchUp = new Vector2(touchUpPoint.x, touchUpPoint.y);
+			final Vector2 cutVec = touchUp.cpy().sub(touchDown).nor().scl(cuttingLength).add(touchDown);
+			// Gdx.app.log(TAG, "Cut Vec " + cutVec + " length " cutVec.len());
+			game.world.rayCast(callback, touchDown, cutVec);
 		}
 		return false;
 	}
 
 	@Override
 	public boolean touchDragged(int screenX, int screenY, int pointer) {
+		game.getShearsTarget().x = screenX;
+		game.getShearsTarget().y = screenY;
+		Gdx.app.log(TAG, "Shears Target " + game.getShearsTarget());
 		return false;
 	}
 
 	@Override
 	public boolean mouseMoved(int screenX, int screenY) {
+		if (!mouseDown) {
+			// final Vector3 mousePos = game.cam.unproject(new Vector3(screenX, screenY, 0));
+			game.getShearsPosition().x = screenX;
+			game.getShearsPosition().y = screenY;
+		}
 		return false;
 	}
 
 	@Override
 	public boolean scrolled(int amount) {
-		if (game.debugEnabled) {
-			game.cam.zoom += amount * 0.5f;
-			game.cam.zoom = MathUtils.clamp(game.cam.zoom, 0.5f, 50f);
-			game.cam.update();
-			Gdx.app.log(TAG, "new zoom " + game.cam.zoom);
-		}
+		// if (game.debugEnabled) {
+		game.cam.zoom += amount * 0.5f;
+		game.cam.zoom = MathUtils.clamp(game.cam.zoom, 0.5f, 50f);
+		game.cam.update();
+		Gdx.app.log(TAG, "new zoom " + game.cam.zoom);
+		// }
 		return false;
 	}
 

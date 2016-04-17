@@ -1,6 +1,7 @@
 package headmade.ld35;
 
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.physics.box2d.Body;
@@ -17,6 +18,8 @@ import com.badlogic.gdx.physics.box2d.joints.RevoluteJointDef;
 import com.badlogic.gdx.physics.box2d.joints.WeldJointDef;
 import com.badlogic.gdx.utils.Array;
 
+import headmade.util.RandomUtil;
+import net.dermetfan.gdx.graphics.g2d.Box2DSprite;
 import net.dermetfan.gdx.physics.box2d.Chain.Connection;
 
 public class PhysicsFactory {
@@ -39,12 +42,31 @@ public class PhysicsFactory {
 	private World				world;
 	private Shape				circleShape;
 
-	private float				leafDensity			= 0.1f;
-	private float				leafRadius			= 0.1f;
+	private float				leafRadius			= Ld35.UNIT_SCALE * 5f;
+
+	private TextureRegion		txPot;
+	private Box2DSprite			potSprite;
+	private Box2DSprite			trunkSprite;
+	private Box2DSprite[]		leafsSprite			= new Box2DSprite[2];
 
 	public PhysicsFactory(World world) {
 		this.world = world;
 		circleShape = new CircleShape();
+
+		txPot = Assets.instance.skin.get(Assets.txPot, TextureRegion.class);
+
+		trunkSprite = new Box2DSprite(Assets.instance.skin.get(Assets.txTrunk, TextureRegion.class));
+		trunkSprite.setZIndex(10);
+		potSprite = new Box2DSprite(txPot);
+		potSprite.setZIndex(11);
+		leafsSprite[0] = new Box2DSprite(Assets.instance.skin.get(Assets.txLeafs[3], TextureRegion.class));
+		leafsSprite[1] = new Box2DSprite(Assets.instance.skin.get(Assets.txLeafs[2], TextureRegion.class));
+		int i = 1;
+		for (final Box2DSprite box2dSprite : leafsSprite) {
+			box2dSprite.setScale(2f);
+			box2dSprite.setZIndex(11 + i);
+			i++;
+		}
 	}
 
 	public void dispose() {
@@ -73,7 +95,7 @@ public class PhysicsFactory {
 		final Body potBody;
 		final float trunkWidth = width / 2f;
 		final float trunkHeight = height + width * 0.8f;
-		final Rectangle trunkRect = new Rectangle(posX - trunkWidth / 2f, posY, trunkWidth, trunkHeight);
+		final Rectangle trunkRect = new Rectangle(posX - trunkWidth / 2f, posY + width, trunkWidth, trunkHeight + width);
 		Gdx.app.log(TAG, "TrunkRect " + trunkRect);
 		{
 			{
@@ -95,8 +117,8 @@ public class PhysicsFactory {
 				potFix.setDensity(1f);
 				potFix.getFilterData().categoryBits = POT_CATEGORYBITS;
 				potFix.getFilterData().maskBits = POT_MASKBITS;
-				// rockerBody.setUserData(rockerSprite);
-				// rockerFix.setUserData(rockerSprite);
+				potBody.setUserData(potSprite);
+				potFix.setUserData(potSprite);
 				potShape.dispose();
 			}
 
@@ -110,15 +132,15 @@ public class PhysicsFactory {
 				final FixtureDef fixDef = new FixtureDef();
 				fixDef.shape = trunkShape;
 				fixDef.density = 1f;
-				fixDef.filter.maskBits = POT_MASKBITS;
-				fixDef.filter.categoryBits = POT_CATEGORYBITS;
+				fixDef.filter.maskBits = TRUNK_MASKBITS;
+				fixDef.filter.categoryBits = TRUNK_CATEGORYBITS;
 				trunkBody = world.createBody(bd);
 				final Fixture trunkFix = trunkBody.createFixture(fixDef);
 				trunkFix.setDensity(1f);
 				trunkFix.getFilterData().categoryBits = TRUNK_CATEGORYBITS;
 				trunkFix.getFilterData().maskBits = TRUNK_MASKBITS;
-				// rockerBody.setUserData(rockerSprite);
-				// rockerFix.setUserData(rockerSprite);
+				trunkBody.setUserData(trunkSprite);
+				trunkFix.setUserData(trunkSprite);
 				trunkShape.dispose();
 			}
 
@@ -126,31 +148,35 @@ public class PhysicsFactory {
 			jointDef.bodyA = potBody;
 			jointDef.bodyB = trunkBody;
 			jointDef.localAnchorA.set(0, 0);
-			jointDef.localAnchorB.set(0, -trunkRect.height / 2);
+			jointDef.localAnchorB.set(0, -trunkRect.height / 2f - width);
 
 			final Joint j1 = world.createJoint(jointDef);
 		}
 
-		final Vector2 leafPos = new Vector2(posX, posY).add(-width / 2f, width * 0.8f);
+		final Vector2 leafPos = new Vector2(posX, posY).add(-width / 2f, width * 1.5f);
 		// create leaf bodies
 		final Array<Array<Body>> bodies = new Array<Array<Body>>();
 		{
 			final FixtureDef fixDef = new FixtureDef();
 			circleShape.setRadius(leafRadius);
 			fixDef.shape = circleShape;
-			fixDef.density = leafDensity;
+			fixDef.density = 0.000001f;
+			fixDef.friction = 0.2f;
+			fixDef.restitution = 0.2f;
 			fixDef.filter.maskBits = LEAF_MASKBITS;
 			fixDef.filter.categoryBits = LEAF_CATEGORYBITS;
 
 			for (int h = 0; leafRadius * h < height; h++) {
 				bodies.add(new Array<Body>());
 				for (int w = 0; leafRadius * w < width; w++) {
-					final Vector2 pos = new Vector2(leafPos.x - width / 2f + leafRadius * 2 * w, leafPos.y + leafRadius * 2 * h);
+					final Vector2 pos = new Vector2(leafPos.x - width / 2f + leafRadius * 2 * w + leafRadius / 2f,
+							leafPos.y + leafRadius * 2 * h);
 					def.position.set(pos);
-					final Body body = world.createBody(def);
-					body.createFixture(fixDef);
-					body.setUserData(new Leaf(body));
-					bodies.get(h).add(body);
+					final Body leafBody = world.createBody(def);
+					final Fixture leafFix = leafBody.createFixture(fixDef);
+					leafFix.setUserData(RandomUtil.random(leafsSprite));
+					leafBody.setUserData(RandomUtil.random(leafsSprite));
+					bodies.get(h).add(leafBody);
 				}
 			}
 			Gdx.app.log(TAG, bodies.size + " bodies high; " + bodies.first().size + " bodies wide");
@@ -167,25 +193,27 @@ public class PhysicsFactory {
 					final Connection connection = new Connection();
 					if (bodies.get(h).size > w + 1) {
 						// joint right
-						// jointDef.frequencyHz = 0;
 						// jointDef.initialize(body, bodies.get(h).get(w + 1), body.getWorldCenter().cpy().add(leafRadius, 0));
+						// jointDef.frequencyHz = 0f;
+						jointDef.collideConnected = true;
 						jointDef.bodyA = body;
 						jointDef.bodyB = bodies.get(h).get(w + 1);
 						jointDef.localAnchorA.set(leafRadius, 0);
 						jointDef.localAnchorB.set(-leafRadius, 0);
-						jointDef.enableLimit = true;
+						// jointDef.enableLimit = true;
 						j = world.createJoint(jointDef);
 						connection.add(j);
 					}
 					if (bodies.size > h + 1) {
 						// joint up
-						// jointDef.frequencyHz = 0;
 						// jointDef.initialize(body, bodies.get(h + 1).get(w), body.getWorldCenter().cpy().add(0, leafRadius));
+						// jointDef.frequencyHz = 0f;
+						jointDef.collideConnected = true;
 						jointDef.bodyA = body;
 						jointDef.bodyB = bodies.get(h + 1).get(w);
 						jointDef.localAnchorA.set(0, leafRadius);
 						jointDef.localAnchorB.set(0, -leafRadius);
-						jointDef.enableLimit = true;
+						// jointDef.enableLimit = true;
 						j = world.createJoint(jointDef);
 						connection.add(j);
 					}
@@ -194,7 +222,7 @@ public class PhysicsFactory {
 						// create joint with trunk
 						// Gdx.app.log(TAG, "Welding to anchor " + body.getWorldCenter());
 						final WeldJointDef jDef = new WeldJointDef();
-						jDef.initialize(trunkBody, body, body.getWorldCenter());
+						jDef.initialize(potBody, body, body.getWorldCenter());
 						// jDef.bodyA = body;
 						// jDef.bodyB = trunkBody;
 						// jDef.localAnchorA.set(0, 0);
